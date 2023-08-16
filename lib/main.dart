@@ -195,6 +195,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         child: const Text("Start uploading"),
                       ),
               ),
+              Container(alignment: AlignmentDirectional.topStart, padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32), child: const Text("Events log:")),
               Expanded(
                 child: Padding(
                     padding: const EdgeInsets.all(16.0),
