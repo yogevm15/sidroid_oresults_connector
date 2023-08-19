@@ -59,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
     AppClient.updates.listen((json) {
       if (json == null) {
         return;
@@ -69,7 +70,6 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       setState(() {
         _events.add(serviceDataUpdate.currEvent!);
-
       });
       //your code
     });
@@ -114,112 +114,167 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Padding(
-          padding: const EdgeInsets.only(top: 16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
+      appBar: AppBar(title: Text(widget.title)),
+      body: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          if (MediaQuery.of(context).orientation == Orientation.landscape) {
+            // Landscape mode or large screen
+            return GridView.count(
+            crossAxisCount: 2,
             children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: TextField(
-                    onChanged: (_) {
-                      setState(() {});
-                    },
-                    enabled: !_running,
-                    controller: _apiKeyController,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Enter Api Key',
-                    )),
-              ),
-              Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    onChanged: (_) {
-                      setState(() {});
-                    },
-                    enabled: !_running,
-                    keyboardType: TextInputType.number,
-                    controller: _portController,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Enter Port',
-                    ),
-                    inputFormatters: <TextInputFormatter>[
-                      FilteringTextInputFormatter.digitsOnly,
-                      NumericalRangeFormatter(min: 0, max: 65535)
-                    ], // Only numbers can be entered,
-                  )),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding:
-                          EdgeInsets.only(left: 8.0, right: 8.0, bottom: 32.0),
-                      child: Text("Upload interval:"),
-                    ),
-                    Slider(
-                      value: _intervalValue,
-                      min: 1,
-                      max: 120,
-                      divisions: 120,
-                      label: '${_intervalValue.round()} seconds',
-                      onChanged: _running
-                          ? null
-                          : (double value) {
-                              setState(() {
-                                _intervalValue = value;
-                              });
-                            },
-                    )
-                  ],
+                SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      _buildTextField(
+                          _apiKeyController, 'Enter Api Key', _running),
+                      _buildTextField(_portController, 'Enter Port', _running),
+                      _buildSlider(),
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: _running
-                    ? FilledButton.tonal(
-                        onPressed: stopUploading,
-                        child: const Text("Stop uploading"))
-                    : FilledButton(
-                        onPressed: _apiKeyController.value.text.isEmpty ||
-                                _portController.value.text.isEmpty
-                            ? null
-                            : startUploading,
-                        child: const Text("Start uploading"),
-                      ),
-              ),
-              Container(alignment: AlignmentDirectional.topStart, padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32), child: const Text("Events log:")),
-              Expanded(
-                child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ListView(
-                      children: _events._items.reversed
-                          .map((e) => ListTile(
-                                title: Text(e.message),
-                                subtitle: Text(e.time.toString()),
-                                trailing: Container(
-                                  width: 8.0,
-                                  height: 8.0,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        e.success ? Colors.green : Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                    )),
-              )
-            ],
-          )),
+                SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      _buildButton(),
+                      _buildLog(),
+                      _buildListView(),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          } else {
+            // Portrait mode or small screen
+            return SingleChildScrollView(
+                child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                _buildTextField(_apiKeyController, 'Enter Api Key', _running),
+                _buildTextField(_portController, 'Enter Port', _running),
+                _buildSlider(),
+                _buildButton(),
+                _buildLog(),
+                _buildListView(),
+              ],
+            ));
+          }
+        },
+      ),
     );
+  }
+
+  Widget _buildTextField(
+      TextEditingController controller, String label, bool running) {
+    bool isPortField = controller == _portController;
+    double verticalPadding =
+        MediaQuery.of(context).orientation == Orientation.landscape
+            ? 8.0
+            : 16.0;
+    return Padding(
+      padding:
+          EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
+      child: TextField(
+        onChanged: (_) {
+          setState(() {});
+        },
+        enabled: !running,
+        controller: controller,
+        keyboardType:
+            isPortField ? TextInputType.number : TextInputType.multiline,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          labelText: label,
+          hintText: label,
+        ),
+        inputFormatters: isPortField
+            ? <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+                NumericalRangeFormatter(min: 0, max: 65535)
+              ]
+            : [],
+        // textCapitalization: MediaQuery.of(context).orientation == Orientation.landscape || MediaQuery.of(context).size.width > 600 ? TextCapitalization.characters : TextCapitalization.none,
+      ),
+    );
+  }
+
+  Widget _buildSlider() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 8.0, right: 8.0, bottom: 32.0),
+            child: Text("Upload interval:"),
+          ),
+          Slider(
+            value: _intervalValue,
+            min: 1,
+            max: 120,
+            divisions: 120,
+            label: '${_intervalValue.round()} seconds',
+            onChanged: _running
+                ? null
+                : (double value) {
+                    setState(() {
+                      _intervalValue = value;
+                    });
+                  },
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: _running
+          ? FilledButton.tonal(
+              onPressed: stopUploading, child: const Text("Stop uploading"))
+          : FilledButton(
+              onPressed: _apiKeyController.value.text.isEmpty ||
+                      _portController.value.text.isEmpty
+                  ? null
+                  : startUploading,
+              child: const Text("Start uploading"),
+            ),
+    );
+  }
+
+  Widget _buildLog() {
+    return Container(
+        alignment: AlignmentDirectional.topStart,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+        child: const Text("Events log:"));
+  }
+
+  Widget _buildListView() {
+    double height =
+    MediaQuery.of(context).orientation == Orientation.landscape
+        ? 130.0
+        : 300.0;
+    return Container(
+      height: height,
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: _events._items.reversed
+              .map((e) => ListTile(
+                    title: Text(e.message),
+                    subtitle: Text("${e.time.year.toString()}-${e.time.month.toString().padLeft(2,'0')}-${e.time.day.toString().padLeft(2,'0')} ${e.time.hour.toString().padLeft(2,'0')}:${e.time.minute.toString().padLeft(2,'0')}:${e.time.second.toString().padLeft(2,'0')}"),
+                    trailing: Container(
+                      width: 8.0,
+                      height: 8.0,
+                      decoration: BoxDecoration(
+                        color: e.success ? Colors.green : Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ));
   }
 }
 
@@ -293,16 +348,17 @@ upload(UploadingData data) async {
     var response = await http.get(Uri.parse(url));
     if (response.statusCode != 200) {
       ServiceClient.update(data
-        ..currEvent = Event("Error, received ${response.statusCode} from SiDroid result service",
-            false, DateTime.now()));
+        ..currEvent = Event(
+            "Error, received ${response.statusCode} from SiDroid result service",
+            false,
+            DateTime.now()));
       return;
     }
     final document = XmlDocument.parse(response.body);
     var id = 1;
-    for (XmlElement element in document.findAllElements('Person'))
-    {
+    for (XmlElement element in document.findAllElements('Person')) {
       final idElement = element.getElement('Id');
-      if ( idElement== null) {
+      if (idElement == null) {
         element.children.add(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
       } else {
         idElement.replace(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
@@ -310,24 +366,30 @@ upload(UploadingData data) async {
       id++;
     }
 
-
     var uri = Uri.https('api.oresults.eu', 'results');
     var request = http.MultipartRequest('POST', uri)
       ..fields['apiKey'] = data.apiKey
-      ..files.add(http.MultipartFile.fromString("file", document.toXmlString()));
+      ..files
+          .add(http.MultipartFile.fromString("file", document.toXmlString()));
     try {
-    var oResultResponse = await request.send();
-    ServiceClient.update(data..currEvent=oResultResponse.statusCode != 200 ? Event("Error, received ${oResultResponse.statusCode} from OResults", false, DateTime.now()) : Event("Uploaded", true, DateTime.now()));
-
+      var oResultResponse = await request.send();
+      ServiceClient.update(data
+        ..currEvent = oResultResponse.statusCode != 200
+            ? Event(
+                "Error, received ${oResultResponse.statusCode} from OResults",
+                false,
+                DateTime.now())
+            : Event("Uploaded", true, DateTime.now()));
     } catch (e) {
       ServiceClient.update(data
-        ..currEvent = Event("Error, OResults connection refused!", false, DateTime.now()));
+        ..currEvent = Event(
+            "Error, OResults connection refused!", false, DateTime.now()));
     }
   } catch (e) {
     ServiceClient.update(data
-      ..currEvent = Event("Error, SiDroid result service not running!", false, DateTime.now()));
+      ..currEvent = Event(
+          "Error, SiDroid result service not running!", false, DateTime.now()));
   }
-
 }
 
 //this entire function runs in your ForegroundService
@@ -378,6 +440,8 @@ class UploadingData extends ServiceData {
         json['apiKey'] as String,
         json['intervalValue'] as int,
         json['port'] as int,
-        json['event'] == null ? null : Event.fromJson(jsonDecode(json['event'])));
+        json['event'] == null
+            ? null
+            : Event.fromJson(jsonDecode(json['event'])));
   }
 }

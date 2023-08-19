@@ -39,6 +39,7 @@ dependencies:
   http: ^1.1.0
   android_long_task: ^1.0.0
   xml: ^6.3.0
+  flutter_adaptive_scaffold: ^0.1.6
 
 dev_dependencies:
   flutter_test:
