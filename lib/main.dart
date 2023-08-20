@@ -119,32 +119,33 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (BuildContext context, BoxConstraints constraints) {
           if (MediaQuery.of(context).orientation == Orientation.landscape) {
             // Landscape mode or large screen
-            return GridView.count(
-            crossAxisCount: 2,
-            children: <Widget>[
-                SingleChildScrollView(
+            return Row(
+              children: <Widget>[
+                Expanded(child: SingleChildScrollView(
                   child: Column(
-                    mainAxisSize: MainAxisSize.max,
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       _buildTextField(
-                          _apiKeyController, 'Enter Api Key', _running),
-                      _buildTextField(_portController, 'Enter Port', _running),
-                      _buildSlider(),
+                              _apiKeyController, 'Enter Api Key', _running),
+                      _buildTextField(
+                              _portController, 'Enter Port', _running),
+                       _buildSlider(),
                     ],
                   ),
-                ),
-                SingleChildScrollView(
+                )),
+                Expanded(child: SingleChildScrollView(
                   child: Column(
-                    mainAxisSize: MainAxisSize.max,
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       _buildButton(),
-                      _buildLog(),
+                      _buildLogTitle(),
                       _buildListView(),
                     ],
                   ),
-                ),
+                )),
               ],
-            );
+            )
+            ;
           } else {
             // Portrait mode or small screen
             return SingleChildScrollView(
@@ -155,7 +156,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 _buildTextField(_portController, 'Enter Port', _running),
                 _buildSlider(),
                 _buildButton(),
-                _buildLog(),
+                _buildLogTitle(),
                 _buildListView(),
               ],
             ));
@@ -176,6 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
       padding:
           EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
       child: TextField(
+          textInputAction: isPortField ? TextInputAction.done : TextInputAction.next,
         onChanged: (_) {
           setState(() {});
         },
@@ -203,6 +205,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
@@ -244,7 +247,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _buildLog() {
+  Widget _buildLogTitle() {
     return Container(
         alignment: AlignmentDirectional.topStart,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
@@ -254,7 +257,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildListView() {
     double height =
     MediaQuery.of(context).orientation == Orientation.landscape
-        ? 130.0
+        ? 150.0
         : 300.0;
     return Container(
       height: height,
