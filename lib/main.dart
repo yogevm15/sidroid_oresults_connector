@@ -391,7 +391,7 @@ upload(UploadingData data) async {
   } catch (e) {
     ServiceClient.update(data
       ..currEvent = Event(
-          "Error, SiDroid result service not running! Exception: $e", false, DateTime.now()));
+          "Error, SiDroid result service not running!", false, DateTime.now()));
   }
 }
 
