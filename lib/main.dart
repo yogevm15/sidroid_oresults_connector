@@ -1,11 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:skeleton_loader/skeleton_loader.dart';
+import 'package:Connector/event_preview.dart';
 import 'package:android_long_task/android_long_task.dart';
+import 'package:timer_count_down/timer_controller.dart';
+import 'package:timer_count_down/timer_count_down.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
+
+import 'exceptions.dart';
 
 const _defaultLightColorScheme = ColorScheme.light();
 
@@ -33,7 +39,7 @@ class MyApp extends StatelessWidget {
             useMaterial3: true,
             colorScheme: darkDynamic ?? _defaultDarkColorScheme),
         themeMode: ThemeMode.system,
-        home: const MyHomePage(title: 'Connector'),
+        home: const MyHomePage(title: 'SIDroid OResults Connector'),
       );
     });
   }
@@ -48,18 +54,24 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+enum RunningState { running, waiting, stopped }
+
 class _MyHomePageState extends State<MyHomePage> {
-  bool _running = false;
+  RunningState _running = RunningState.stopped;
   double _intervalValue = 20;
   Timer? _currWorker;
   final _events = LimitedSizeList<Event>(100);
   final _portController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _eventsListKey = GlobalKey<AnimatedListState>();
+  CountdownController _countdownController = CountdownController();
+  RunningState _uploading = RunningState.stopped;
+  EventApiResponse? _currEventData;
+  bool isValidPort = false;
 
   @override
   void initState() {
     super.initState();
-
     AppClient.updates.listen((json) {
       if (json == null) {
         return;
@@ -69,16 +81,23 @@ class _MyHomePageState extends State<MyHomePage> {
         return;
       }
       setState(() {
-        _events.add(serviceDataUpdate.currEvent!);
+        if (serviceDataUpdate.currEvent?.message == "Done timer") {
+          _uploading = RunningState.running;
+          _eventsListKey.currentState?.insertItem(0);
+        } else {
+          _countdownController = CountdownController(autoStart: true);
+          _uploading = RunningState.waiting;
+          if (_events.items.length >= _events.maxSize) {
+            _eventsListKey.currentState?.removeItem( _events.maxSize - 1, (context, animation) => const SizedBox.shrink());
+          }
+          _events.add(serviceDataUpdate.currEvent!);
+        }
       });
       //your code
     });
   }
 
   startUploading() async {
-    setState(() {
-      _running = true;
-    });
     if (_currWorker != null) {
       return;
     }
@@ -99,7 +118,12 @@ class _MyHomePageState extends State<MyHomePage> {
     _currWorker?.cancel();
     await AppClient.stopService();
     setState(() {
-      _running = false;
+      if (_uploading == RunningState.running) {
+        _eventsListKey.currentState?.removeItem(0, (context, animation) => const SizedBox.shrink());
+      }
+      _uploading = RunningState.stopped;
+      _running = RunningState.stopped;
+      _currEventData = null;
     });
   }
 
@@ -121,41 +145,42 @@ class _MyHomePageState extends State<MyHomePage> {
             // Landscape mode or large screen
             return Row(
               children: <Widget>[
-                Expanded(child: SingleChildScrollView(
+                Expanded(
+                    child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      _buildTextField(
-                              _apiKeyController, 'Enter Api Key', _running),
-                      _buildTextField(
-                              _portController, 'Enter Port', _running),
-                       _buildSlider(),
+                      _buildApiKeyTextField(),
+                      _buildPortTextField(),
+                      _buildSlider(),
                     ],
                   ),
                 )),
-                Expanded(child: SingleChildScrollView(
+                Expanded(
+                    child: SingleChildScrollView(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    // mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       _buildButton(),
+                      _buildEventPreview(),
                       _buildLogTitle(),
                       _buildListView(),
                     ],
                   ),
                 )),
               ],
-            )
-            ;
+            );
           } else {
             // Portrait mode or small screen
             return SingleChildScrollView(
                 child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                _buildTextField(_apiKeyController, 'Enter Api Key', _running),
-                _buildTextField(_portController, 'Enter Port', _running),
+                _buildApiKeyTextField(),
+                _buildPortTextField(),
                 _buildSlider(),
                 _buildButton(),
+                _buildEventPreview(),
                 _buildLogTitle(),
                 _buildListView(),
               ],
@@ -166,9 +191,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Widget _buildTextField(
-      TextEditingController controller, String label, bool running) {
-    bool isPortField = controller == _portController;
+  Widget _buildApiKeyTextField() {
     double verticalPadding =
         MediaQuery.of(context).orientation == Orientation.landscape
             ? 8.0
@@ -177,26 +200,47 @@ class _MyHomePageState extends State<MyHomePage> {
       padding:
           EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
       child: TextField(
-          textInputAction: isPortField ? TextInputAction.done : TextInputAction.next,
+        textInputAction: TextInputAction.next,
         onChanged: (_) {
           setState(() {});
         },
-        enabled: !running,
-        controller: controller,
-        keyboardType:
-            isPortField ? TextInputType.number : TextInputType.multiline,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          labelText: label,
-          hintText: label,
+        enabled: _running == RunningState.stopped,
+        controller: _apiKeyController,
+        keyboardType: TextInputType.multiline,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          labelText: "Enter Api Key",
+          hintText: "Enter Api Key",
         ),
-        inputFormatters: isPortField
-            ? <TextInputFormatter>[
-                FilteringTextInputFormatter.digitsOnly,
-                NumericalRangeFormatter(min: 0, max: 65535)
-              ]
-            : [],
-        // textCapitalization: MediaQuery.of(context).orientation == Orientation.landscape || MediaQuery.of(context).size.width > 600 ? TextCapitalization.characters : TextCapitalization.none,
+      ),
+    );
+  }
+
+  Widget _buildPortTextField() {
+    double verticalPadding =
+        MediaQuery.of(context).orientation == Orientation.landscape
+            ? 8.0
+            : 16.0;
+    return Padding(
+      padding:
+          EdgeInsets.symmetric(horizontal: 16.0, vertical: verticalPadding),
+      child: TextField(
+        textInputAction: TextInputAction.done,
+        onChanged: (_) {
+          setState(() {});
+        },
+        enabled: _running == RunningState.stopped,
+        controller: _portController,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          border: OutlineInputBorder(),
+          labelText: "Enter Port",
+          hintText: "Enter Port",
+        ),
+        inputFormatters: <TextInputFormatter>[
+          FilteringTextInputFormatter.digitsOnly,
+          NumericalRangeFormatter(min: 0, max: 65535)
+        ],
       ),
     );
   }
@@ -214,11 +258,12 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           Slider(
             value: _intervalValue,
-            min: 1,
+            min: 5,
             max: 120,
-            divisions: 120,
+            divisions: 115,
             label: '${_intervalValue.round()} seconds',
-            onChanged: _running
+            onChanged: _running == RunningState.running ||
+                    _running == RunningState.waiting
                 ? null
                 : (double value) {
                     setState(() {
@@ -231,53 +276,260 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Widget _buildEventPreview() {
+    return _running == RunningState.waiting
+        ? SkeletonLoader(
+            builder: ListTile(
+              leading: Container(
+                height: 38,
+                width: 54,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+              title: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      // alignment: Alignment.bottomLeft,
+                      height: 14,
+                      width: 75,
+                      decoration: BoxDecoration(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(4)),
+                          color: Theme.of(context).primaryColor),
+                    )
+                  ]),
+              subtitle: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      // alignment: Alignment.bottomLeft,
+                      height: 10,
+                      width: 130,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(4)),
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    )
+                  ]),
+              trailing: Container(
+                  width: 70.0,
+                  height: 8.0,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.all(Radius.circular(4)),
+                    color: Theme.of(context).primaryColor,
+                  )),
+            ),
+            period: const Duration(seconds: 1),
+            direction: SkeletonDirection.ltr,
+            highlightColor: Theme.of(context).highlightColor,
+          )
+        : EventPreview(
+            data: _currEventData,
+          );
+  }
+
   Widget _buildButton() {
+    Widget childWidget;
+    switch (_running) {
+      case RunningState.stopped:
+        childWidget = FilledButton(
+          onPressed: _apiKeyController.value.text.isEmpty ||
+                  _portController.value.text.isEmpty
+              ? null
+              : () async {
+                  setState(() {
+                    _running = RunningState.waiting;
+                  });
+                  EventApiResponse eventData;
+                  try {
+                    eventData =
+                        await fetchEventData(_apiKeyController.value.text);
+
+                    await upload(int.parse(_portController.value.text),
+                        _apiKeyController.value.text);
+                  } on BaseError catch (e) {
+                    showAlertDialog("Error", e.err);
+                    setState(() {
+                      _running = RunningState.stopped;
+                    });
+                    return;
+                  }
+                  setState(() {
+                    _currEventData = eventData;
+                    _countdownController = CountdownController(autoStart: true);
+                    _uploading = RunningState.waiting;
+                    if (_events.items.length >= _events.maxSize) {
+                      _eventsListKey.currentState?.removeItem( _events.maxSize - 1, (context, animation) => const SizedBox.shrink());
+                    }
+                    _events.add(Event("Started, Uploaded", true, DateTime.now()));
+                    _eventsListKey.currentState?.insertItem(0);
+                    _running = RunningState.running;
+                  });
+                  startUploading();
+                },
+          child: const Text("Start uploading"),
+        );
+      case RunningState.waiting:
+        childWidget = const FilledButton(
+          onPressed: null,
+          child: Text("Stop uploading"),
+        );
+      case RunningState.running:
+        childWidget = FilledButton.tonal(
+            onPressed: () {
+              stopUploading();
+            },
+            child: const Text("Stop uploading"));
+    }
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: _running
-          ? FilledButton.tonal(
-              onPressed: stopUploading, child: const Text("Stop uploading"))
-          : FilledButton(
-              onPressed: _apiKeyController.value.text.isEmpty ||
-                      _portController.value.text.isEmpty
-                  ? null
-                  : startUploading,
-              child: const Text("Start uploading"),
-            ),
+      child: childWidget,
     );
   }
 
   Widget _buildLogTitle() {
-    return Container(
-        alignment: AlignmentDirectional.topStart,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-        child: const Text("Events log:"));
-  }
+    final Widget timer = _uploading == RunningState.waiting
+        ? Countdown(
+            build: (BuildContext _, double time) => buildCountdownText(time.toInt()),
+            seconds: _intervalValue.toInt(),
+            controller: _countdownController,
+          )
+        : const SizedBox.shrink();
 
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 16, left: 32, right: 38),
+      child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [const Text("Events log:"), timer]),
+    );
+  }
+  
+  Widget buildCountdownText(int seconds) {
+    if (seconds==0) {
+      return const Text("");
+    } else if (seconds % 60 == 0) {
+      return Text("${(seconds/60).floor()}m");
+    } else if (seconds > 60) {
+      return Text("${(seconds/60).floor()}m ${seconds%60}s");
+    } else {
+      return Text("${seconds}s");
+    }
+  }
+  
   Widget _buildListView() {
-    double height =
-    MediaQuery.of(context).orientation == Orientation.landscape
-        ? 150.0
-        : 300.0;
+    double height = MediaQuery.of(context).orientation == Orientation.landscape
+        ? _running == RunningState.stopped ? 170 : 95.0
+        : _running == RunningState.stopped ? 310 : 235.0;
+
     return Container(
-      height: height,
+        height: height,
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: _events._items.reversed
-              .map((e) => ListTile(
-                    title: Text(e.message),
-                    subtitle: Text("${e.time.year.toString()}-${e.time.month.toString().padLeft(2,'0')}-${e.time.day.toString().padLeft(2,'0')} ${e.time.hour.toString().padLeft(2,'0')}:${e.time.minute.toString().padLeft(2,'0')}:${e.time.second.toString().padLeft(2,'0')}"),
-                    trailing: Container(
+        child: AnimatedList(
+          key: _eventsListKey,
+          itemBuilder: (context, index, animation) {
+            List<Widget> children = _uploading == RunningState.running
+                ? [
+              SkeletonLoader(
+                builder: ListTile(
+                  title: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          // alignment: Alignment.bottomLeft,
+                          height: 14,
+                          width: 75,
+                          decoration: BoxDecoration(
+                              borderRadius:
+                              const BorderRadius.all(Radius.circular(4)),
+                              color: Theme.of(context).primaryColor),
+                        )
+                      ]),
+                  subtitle: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          // alignment: Alignment.bottomLeft,
+                          height: 10,
+                          width: 135,
+                          decoration: BoxDecoration(
+                            borderRadius:
+                            const BorderRadius.all(Radius.circular(4)),
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        )
+                      ]),
+                  trailing: Container(
                       width: 8.0,
                       height: 8.0,
                       decoration: BoxDecoration(
-                        color: e.success ? Colors.green : Colors.red,
                         shape: BoxShape.circle,
-                      ),
-                    ),
-                  ))
-              .toList(),
+                        color: Theme.of(context).primaryColor,
+                      )),
+                ),
+                period: const Duration(seconds: 1),
+                direction: SkeletonDirection.ltr,
+                highlightColor: Theme.of(context).highlightColor,
+              )
+            ]
+                : [];
+            children.addAll(_events._items.reversed.map((e) => ListTile(
+              title: Text(e.message),
+              subtitle: Text(
+                  "${e.time.year.toString()}-${e.time.month.toString().padLeft(2, '0')}-${e.time.day.toString().padLeft(2, '0')} ${e.time.hour.toString().padLeft(2, '0')}:${e.time.minute.toString().padLeft(2, '0')}:${e.time.second.toString().padLeft(2, '0')}"),
+              trailing: Container(
+                width: 8.0,
+                height: 8.0,
+                decoration: BoxDecoration(
+                  color: e.success ? Colors.green : Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            )));
+            return SizeTransition(
+                sizeFactor: animation, child: children[index]);
+          },
         ));
+  }
+
+  showAlertDialog(String title, String content) {
+    // set up the button
+    Widget okButton = TextButton(
+      child: const Text("OK"),
+      onPressed: () {
+        Navigator.of(context).pop();
+      },
+    );
+
+    // set up the AlertDialog
+    AlertDialog alert = AlertDialog(
+      icon: const Icon(Icons.warning_amber, color: Colors.redAccent),
+      title: Text(
+        title,
+        textAlign: TextAlign.center,
+      ),
+      content: Text(
+        content,
+      ),
+      actions: [
+        okButton,
+      ],
+    );
+
+    // show the dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
+    );
   }
 }
 
@@ -345,53 +597,40 @@ class NumericalRangeFormatter extends TextInputFormatter {
   }
 }
 
-upload(UploadingData data) async {
-  String url = "http://localhost:${data.port}/reports/ResultsIof30Xml";
+upload(int port, String apiKey) async {
+  Uri url = Uri.http("localhost:$port", "reports/ResultsIof30Xml");
+  http.Response response;
   try {
-    var response = await http.get(Uri.parse(url));
-    if (response.statusCode != 200) {
-      ServiceClient.update(data
-        ..currEvent = Event(
-            "Error, received ${response.statusCode} from SiDroid result service",
-            false,
-            DateTime.now()));
-      return;
+    response = await http.get(url);
+  } catch (_) {
+    throw SiDroidResultsServiceNotRunning();
+  }
+  if (response.statusCode != 200) {
+    throw FetchResultsFromSiDroidFailed(response.body);
+  }
+  final document = XmlDocument.parse(response.body);
+  var id = 1;
+  for (XmlElement element in document.findAllElements('Person')) {
+    final idElement = element.getElement('Id');
+    if (idElement == null) {
+      element.children.add(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
+    } else {
+      idElement.replace(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
     }
-    final document = XmlDocument.parse(response.body);
-    var id = 1;
-    for (XmlElement element in document.findAllElements('Person')) {
-      final idElement = element.getElement('Id');
-      if (idElement == null) {
-        element.children.add(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
-      } else {
-        idElement.replace(XmlElement(XmlName("Id"), [], [XmlText("$id")]));
-      }
-      id++;
-    }
+    id++;
+  }
 
-    var uri = Uri.https('api.oresults.eu', 'results');
-    var request = http.MultipartRequest('POST', uri)
-      ..fields['apiKey'] = data.apiKey
-      ..files
-          .add(http.MultipartFile.fromString("file", document.toXmlString()));
-    try {
-      var oResultResponse = await request.send();
-      ServiceClient.update(data
-        ..currEvent = oResultResponse.statusCode != 200
-            ? Event(
-                "Error, received ${oResultResponse.statusCode} from OResults",
-                false,
-                DateTime.now())
-            : Event("Uploaded", true, DateTime.now()));
-    } catch (e) {
-      ServiceClient.update(data
-        ..currEvent = Event(
-            "Error, OResults connection refused!", false, DateTime.now()));
-    }
-  } catch (e) {
-    ServiceClient.update(data
-      ..currEvent = Event(
-          "Error, SiDroid result service not running!", false, DateTime.now()));
+  var uri = Uri.https('api.oresults.eu', 'results');
+  var request = http.MultipartRequest('POST', uri)
+    ..fields['apiKey'] = apiKey
+    ..files.add(http.MultipartFile.fromString("file", document.toXmlString()));
+  try {
+    response = await http.Response.fromStream(await request.send());
+  } catch (_) {
+    throw CouldNotReachOresults();
+  }
+  if (response.statusCode != 200) {
+    throw UploadToEventFailed(response.body);
   }
 }
 
@@ -408,8 +647,25 @@ serviceMain() async {
     //you set initialData when you are calling AppClient.execute()
     //from your flutter application code and receive it here
     var serviceData = UploadingData.fromJson(initialData);
-    Timer.periodic(Duration(seconds: serviceData.intervalValue),
-        (_) => upload(serviceData));
+    uploadPeriodic(serviceData);
+  });
+}
+
+uploadPeriodic(UploadingData serviceData) {
+  Timer(Duration(seconds: serviceData.intervalValue), () async {
+    ServiceClient.update(serviceData
+      ..currEvent =
+          serviceData.currEvent = Event("Done timer", true, DateTime.now()));
+    try {
+      await upload(serviceData.port, serviceData.apiKey);
+      ServiceClient.update(
+          serviceData..currEvent = Event("Uploaded", true, DateTime.now()));
+    } on BaseError catch (e) {
+      ServiceClient.update(
+          serviceData..currEvent = Event(e.err, false, DateTime.now()));
+    } finally {
+      uploadPeriodic(serviceData);
+    }
   });
 }
 

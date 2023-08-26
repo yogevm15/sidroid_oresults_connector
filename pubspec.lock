@@ -9,6 +9,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  args:
+    dependency: transitive
+    description:
+      name: args
+      sha256: eef6c46b622e0494a36c5a12d10d77fb4e855501a91c1b9ef9339326e58f0596
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.2"
   async:
     dependency: transitive
     description:
@@ -49,6 +57,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.17.1"
+  convert:
+    dependency: transitive
+    description:
+      name: convert
+      sha256: "0f08b14755d163f6e2134cb58222dd25ea2a2ee8a195e53983d57c075324d592"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.1"
+  country_flags:
+    dependency: "direct main"
+    description:
+      name: country_flags
+      sha256: fa9683dd1b163c160e26a6c46a44f3874798ca6f7d776162c7c7358d4ad24c9c
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   cupertino_icons:
     dependency: "direct main"
     description:
@@ -115,6 +139,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.2"
+  intl:
+    dependency: "direct main"
+    description:
+      name: intl
+      sha256: "3bc132a9dbce73a7e4a21a17d06e1878839ffbf975568bc875c60537824b0c4d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.18.1"
+  jovial_misc:
+    dependency: transitive
+    description:
+      name: jovial_misc
+      sha256: f6e64f789ee311025bb367be9c9afe9759f76dd8209070b7f38e735b5f529eb1
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.5"
+  jovial_svg:
+    dependency: transitive
+    description:
+      name: jovial_svg
+      sha256: "5fd52a96fe3d2b69082c53374364649f51cb1b3e06ca6be3601ed8cae537bc7b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.17"
   js:
     dependency: transitive
     description:
@@ -171,6 +219,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.4.0"
+  pointycastle:
+    dependency: transitive
+    description:
+      name: pointycastle
+      sha256: "7c1e5f0d23c9016c5bbd8b1473d0d3fb3fc851b876046039509e18e0c7485f2c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.7.3"
+  shimmer:
+    dependency: transitive
+    description:
+      name: shimmer
+      sha256: "1f1009b5845a1f88f1c5630212279540486f97409e9fc3f63883e71070d107bf"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
+  skeleton_loader:
+    dependency: "direct main"
+    description:
+      name: skeleton_loader
+      sha256: "49440f69c9f0187265c6579f9bddfff7a4f200467469788e1ef12c42241e72da"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0+4"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -224,6 +296,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.5.1"
+  timer_count_down:
+    dependency: "direct main"
+    description:
+      name: timer_count_down
+      sha256: d025d408c2654e497ca0bd4bde014bd7509d4c6397af4ed23a0f9b692bbcf337
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.2"
   typed_data:
     dependency: transitive
     description:
